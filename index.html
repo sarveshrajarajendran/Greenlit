@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greenlit: Practice like it’s real.</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%230f3d2c'/%3E%3Crect x='15' y='9' width='10' height='22' rx='2' fill='%233ddc97'/%3E%3C/svg%3E">
+<meta name="description" content="Greenlit: practice like it’s real, with pretend money. Free paper trading, parties with friends, and ranks for beginners.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f1;--card:#fff;--ink:#13202b;--mute:#5b6b76;--line:#d5dfdb;--up:#0b8f5f;--down:#c93c3c;--hi:#2fd48b;--hiink:#04261a;--btn:#13202b;--btnink:#fff;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1519;--card:#16212a;--ink:#e8eef0;--mute:#93a3ad;--line:#27363f;--up:#3ddc97;--down:#ff7070;--btn:#e8eef0;--btnink:#0e1519;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1519;--card:#16212a;--ink:#e8eef0;--mute:#93a3ad;--line:#27363f;--up:#3ddc97;--down:#ff7070;--btn:#e8eef0;--btnink:#0e1519;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Source Sans 3",system-ui,sans-serif}
+h1,h2,h3{font-family:"Fraunces",Georgia,serif;margin:0;line-height:1.15}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px}
+header{padding:18px 0 10px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px}
+.mark{width:44px;height:44px;flex:none;filter:drop-shadow(0 4px 12px rgba(47,212,139,.4))}
+.wm{display:block;font:800 34px/1 "Fraunces",Georgia,serif;letter-spacing:-.03em}
+.wm em{font-style:italic;font-weight:600;color:var(--up)}
+.tag{display:block;margin-top:5px;font:600 11px "Source Sans 3",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+.pill{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--down)}.dot.on{background:var(--up);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.35}}@media(prefers-reduced-motion:reduce){.dot.on{animation:none}}
+.tick{display:flex;gap:22px;overflow-x:auto;padding:8px 2px;border-block:1px solid var(--line);font-weight:600;white-space:nowrap;min-height:42px}
+.up{color:var(--up)}.dn{color:var(--down)}
+nav{display:flex;gap:6px;margin:14px 0;overflow-x:auto;padding-bottom:2px}
+nav button{flex:1 0 auto;white-space:nowrap;font:600 15px "Source Sans 3",sans-serif;padding:10px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--btn);color:var(--btnink);border-color:var(--btn)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--hi);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font:600 14px "Source Sans 3",sans-serif}
+.chip[aria-pressed="true"]{background:var(--hi);color:var(--hiink);border-color:var(--hi)}
+.price{font:800 36px "Fraunces",serif}
+svg.chart{width:100%;height:auto;display:block}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=number],input[type=email],input[type=text],input[type=password],select{padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:600 16px "Source Sans 3",sans-serif;min-width:0}
+input[type=number].q{width:100px}
+.b{padding:10px 18px;border-radius:10px;border:0;font:600 16px "Source Sans 3",sans-serif;cursor:pointer;color:#fff}
+.buy{background:#0b8f5f}.sell{background:#c93c3c}.b:disabled{opacity:.45;cursor:not-allowed}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:right;padding:7px 4px;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}
+.mute{color:var(--mute)}.small{font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat b{display:block;font:800 22px "Fraunces",serif}
+.coach{border-left:4px solid var(--hi);padding:6px 10px;margin:8px 0;background:var(--bg);border-radius:0 8px 8px 0}
+.toast{min-height:24px;font-weight:600}
+details{border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:10px;padding:2px 14px}
+summary{cursor:pointer;padding:12px 0;font:800 18px "Fraunces",serif}
+details.done summary::after{content:"  ✓ done";color:var(--up);font:600 14px "Source Sans 3",sans-serif}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--up);width:0}
+.vid{position:relative;padding-top:56.25%;margin-bottom:10px}.vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px}
+.news a{display:block;text-decoration:none;color:inherit;padding:10px 0;border-bottom:1px solid var(--line)}
+.news a:hover b{text-decoration:underline}
+ol.lb{padding-left:24px;margin:0}ol.lb li{padding:6px 0;border-bottom:1px solid var(--line)}ol.lb span{float:right;font-weight:600}
+.achg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px}
+.at{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px}.at.locked{opacity:.55}
+.achbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%) translateY(30px);background:var(--hi);color:var(--hiink);padding:10px 16px;border-radius:12px;font-weight:600;max-width:92vw;opacity:0;pointer-events:none;transition:.3s;z-index:5}
+.achbar.show{opacity:1;transform:translateX(-50%)}
+@media(prefers-reduced-motion:reduce){.achbar{transition:none}}
+.av{position:relative;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg);border:2px solid var(--line);flex:none;line-height:1;vertical-align:middle}
+.ac{position:absolute;left:50%;transform:translateX(-50%);line-height:1;pointer-events:none}.ac.top{bottom:58%}.ac.eyes{top:20%}
+.pcard{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.banner{height:96px;background-size:100% 100%;position:relative;overflow:hidden}.banner::after{content:"";position:absolute;inset:0;pointer-events:none}
+.fx-shimmer::after{background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);background-size:250% 100%;animation:shim 3.2s linear infinite}
+.fx-twinkle::after{background-image:radial-gradient(2px 2px at 12% 30%,#fff,transparent),radial-gradient(2px 2px at 38% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 62% 25%,#fff,transparent),radial-gradient(2px 2px at 82% 65%,#fff,transparent),radial-gradient(1.5px 1.5px at 93% 20%,#fff,transparent);animation:twk 2.2s ease-in-out infinite alternate}
+.fx-aurora{background-size:300% 300%!important;animation:aur 9s ease infinite}
+.fx-glow{animation:glw 2.6s ease-in-out infinite alternate}
+@keyframes shim{from{background-position:150% 0}to{background-position:-100% 0}}@keyframes twk{from{opacity:.25}to{opacity:1}}
+@keyframes aur{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}@keyframes glw{from{box-shadow:inset 0 0 12px rgba(255,255,255,.1)}to{box-shadow:inset 0 0 38px var(--hi)}}
+@media(prefers-reduced-motion:reduce){.fx-shimmer::after,.fx-twinkle::after,.fx-aurora,.fx-glow{animation:none}}
+.pbody{display:flex;gap:14px;align-items:flex-end;padding:0 16px 14px;margin-top:-36px;flex-wrap:wrap}.pbody .av{border:4px solid var(--card)}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px;margin-top:8px}
+.opt{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);cursor:pointer;font:600 13px "Source Sans 3",sans-serif;text-align:center}
+.opt[aria-pressed="true"]{border-color:var(--hi);box-shadow:0 0 0 2px var(--hi)}.opt:disabled{opacity:.5;cursor:not-allowed}
+.opt small{font-weight:400;color:var(--mute);font-size:11px}.opt .e{font-size:26px;line-height:1.1}.sw{width:100%;height:26px;border-radius:8px}.dotc{width:26px;height:26px;border-radius:50%}
+.hide{display:none}footer{padding:18px 0 40px;color:var(--mute);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo"><svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#145a41"/><stop offset="1" stop-color="#0a2a1f"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#gl)"/><g stroke-linecap="round"><line x1="12" y1="10" x2="12" y2="31" stroke="#ff8a8a" stroke-width="2"/><rect x="9" y="17" width="6" height="9" rx="1.5" fill="#ff8a8a"/><line x1="21" y1="7" x2="21" y2="31" stroke="#3ddc97" stroke-width="2"/><rect x="18" y="12" width="6" height="14" rx="1.5" fill="#3ddc97"/><line x1="30" y1="5" x2="30" y2="27" stroke="#8dffc9" stroke-width="2"/><rect x="27" y="8" width="6" height="12" rx="1.5" fill="#8dffc9"/></g></svg><div><span class="wm">Green<em>lit</em></span><span class="tag">Practice like it’s real.</span></div></div>
+  <div class="row">
+    <div class="pill" id="rank" title="Earn XP by unlocking achievements"></div>
+    <div class="pill" role="status"><span class="dot" id="dot"></span><span id="clk">Checking market…</span></div>
+    <button class="chip" id="prac" aria-pressed="false" title="Fill orders instantly at the last price while the market is closed (for testing)">Instant fills</button>
+  </div>
+</header>
+<div class="tick" id="tick" aria-label="Stock prices"></div>
+<nav role="tablist">
+  <button role="tab" data-t="trade" aria-selected="true">Trade</button>
+  <button role="tab" data-t="learn" aria-selected="false">Learn</button>
+  <button role="tab" data-t="news" aria-selected="false">News</button>
+  <button role="tab" data-t="party" aria-selected="false">Parties</button>
+  <button role="tab" data-t="board" aria-selected="false">Rankings</button>
+  <button role="tab" data-t="profile" aria-selected="false">Profile</button>
+</nav>
+
+<section id="trade">
+  <div class="card" id="start">
+    <h2>New here? Start in 3 steps</h2>
+    <ol><li>Choose how much pretend money to start with.</li><li>Pick a stock, look at its chart, and buy a few shares. The coach explains your move.</li><li>Open <b>Learn</b> and finish lesson 1. Every milestone earns XP and a higher rank.</li></ol>
+    <button class="b ghost" id="gotit">Got it, hide this</button>
+  </div>
+  <div class="card hide" id="auth"></div>
+  <div class="card row hide" id="gbar"><label for="gsel"><b>Game</b></label><select id="gsel"></select></div>
+
+  <div class="card hide" id="pick">
+    <h2>Choose your starting amount</h2>
+    <p class="mute">Everything here is pretend money. Pick how much to start with. Rankings compare your <b>percent return</b>, so any amount is fair.</p>
+    <div class="row" style="margin:10px 0">
+      <button class="b ghost" data-amt="10000">$10,000</button><button class="b ghost" data-amt="50000">$50,000</button>
+      <button class="b ghost" data-amt="100000">$100,000</button><button class="b ghost" data-amt="1000000">$1,000,000</button>
+    </div>
+    <div class="row"><label for="amt">Or your own (1,000 to 10,000,000)</label><input type="number" id="amt" min="1000" max="10000000" step="1000" value="25000"><button class="b ghost" id="amtgo">Start with this</button></div>
+    <div class="toast" id="pickmsg" aria-live="polite"></div>
+  </div>
+
+  <div id="play">
+    <div class="grid">
+      <div class="card">
+        <div class="chips" id="chips"></div>
+        <div class="row" style="justify-content:space-between"><div><div class="mute small" id="nm"></div><div class="price" id="px">…</div></div><div class="small mute" id="chg"></div></div>
+        <div class="chips" id="ranges" style="margin-top:8px">
+          <button class="chip" data-r="live" aria-pressed="true">Live</button><button class="chip" data-r="today" aria-pressed="false">Today</button>
+          <button class="chip" data-r="yesterday" aria-pressed="false">Yesterday</button><button class="chip" data-r="week" aria-pressed="false">Past week</button>
+          <button class="chip" data-r="month" aria-pressed="false">Past month</button>
+        </div>
+        <div class="chips" id="modes"><button class="chip" data-mode="candle" aria-pressed="true">Candles</button><button class="chip" data-mode="line" aria-pressed="false">Line</button></div>
+        <svg class="chart" id="chart" viewBox="0 0 600 220" role="img" aria-label="Price chart"></svg>
+        <div class="small mute" id="src"></div>
+      </div>
+      <div class="card">
+        <h2>Place an order</h2>
+        <p class="mute small">Market orders fill at the latest price.</p>
+        <div class="row"><label for="qty">Shares</label><input type="number" class="q" id="qty" min="1" value="10"></div>
+        <div class="row" style="margin:12px 0"><button class="b buy" id="buy">Buy</button><button class="b sell" id="sell">Sell</button></div>
+        <div class="small mute" id="est"></div>
+        <div class="toast" id="toast" aria-live="polite"></div>
+        <div id="coach"></div>
+      </div>
+    </div>
+    <div class="card hide" id="review" aria-live="polite"></div>
+    <div class="card"><h2 style="margin-bottom:8px">Queued orders</h2><div id="queue"></div></div>
+    <div class="card"><div class="stats">
+      <div class="stat"><span class="mute small">Account value</span><b id="tv"></b></div>
+      <div class="stat"><span class="mute small">Cash</span><b id="cash"></b></div>
+      <div class="stat"><span class="mute small">Return</span><b id="ret"></b></div></div></div>
+    <div class="card"><h2 style="margin-bottom:8px">Your positions</h2><div id="pos"></div></div>
+    <div class="card"><h2 style="margin-bottom:8px">Trade log</h2><div id="log"></div><button class="b ghost" id="reset" style="margin-top:10px">Start a new game</button></div>
+  </div>
+</section>
+
+<section id="learn" class="hide">
+  <div class="card"><h2>Trading, from zero</h2><p class="mute">Short lessons. Open one, read it, watch a video, then tick it off.</p><div class="bar"><i id="prog"></i></div><p class="small mute" id="progt"></p></div>
+  <div id="lessons"></div>
+</section>
+
+<section id="news" class="hide">
+  <div class="card news"><h2 style="margin-bottom:6px">Market headlines</h2><p class="mute small">Headlines link to the original publisher.</p><div id="headlines">Loading…</div></div>
+</section>
+
+<section id="party" class="hide">
+  <div class="card"><h2 style="margin-bottom:6px">Play with friends</h2><p class="mute" id="pmsg"></p>
+    <div id="pforms" class="hide">
+      <h3 style="margin:14px 0 6px">Create a party</h3>
+      <div class="row"><input type="text" id="pn" maxlength="30" placeholder="Party name" aria-label="Party name">
+        <select id="pa" aria-label="Starting amount"><option value="10000">$10,000</option><option value="50000">$50,000</option><option value="100000" selected>$100,000</option><option value="1000000">$1,000,000</option></select>
+        <button class="b ghost" id="pcreate">Create</button></div>
+      <h3 style="margin:14px 0 6px">Join with a code</h3>
+      <div class="row"><input type="text" id="pc" maxlength="6" placeholder="6-letter code" aria-label="Party code"><button class="b ghost" id="pjoin">Join</button></div>
+      <div class="toast" id="pfm" aria-live="polite"></div>
+    </div></div>
+  <div id="plist"></div>
+</section>
+
+<section id="board" class="hide">
+  <div class="card" id="mine"></div>
+  <div class="card"><h2 style="margin-bottom:6px">Global leaderboard</h2><p class="mute small">Ranked by percent return since the start, so any starting amount is fair.</p><ol class="lb" id="lb"></ol></div>
+</section>
+
+<section id="profile" class="hide"><div id="pview"></div></section>
+
+<footer>Greenlit is a free educational project. No ads, no real money, and nothing here is financial advice. Prices may be delayed.</footer>
+</div>
+<div class="achbar" id="achbar" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="lessons.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
