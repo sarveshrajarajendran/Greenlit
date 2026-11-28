@@ -4,9 +4,11 @@ var $ = function (i) { return document.getElementById(i); };
 var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
 var money = function (n) { return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }); };
 var fmtp = function (n) { return (n >= 0 ? "+" : "") + n.toFixed(2) + "%"; };
+var ico = function (n, cls) { return "<svg class='ico" + (cls ? " " + cls : "") + "' aria-hidden='true'><use href='#i-" + n + "'/></svg>"; };
+var G = window.GAME, UNITS = window.UNITS || [];
 
 /* ---------- ranks and achievements ---------- */
-var RANKS = [[0, "🌱", "Starter"], [50, "📈", "Trader"], [150, "💼", "Pro"], [300, "🏆", "Expert"]];
+var RANKS = [[0, "Starter"], [50, "Trader"], [150, "Pro"], [300, "Expert"], [700, "Legend"]];
 function rankOf(xp) { var r = RANKS[0]; RANKS.forEach(function (x) { if (xp >= x[0]) r = x; }); return r; }
 function doneCount() { return Object.keys(S.done).length; }
 function retPct() { return S.start > 0 ? (total() / S.start - 1) * 100 : 0; }
@@ -21,9 +23,13 @@ var ACH = [
   { id: "all", t: "Straight-A student", d: "Finish every lesson.", xp: 50, ok: function () { var n = (window.LESSONS || []).length; return n > 0 && doneCount() >= n; } },
   { id: "up5", t: "Up 5%", d: "Grow a game 5% above your starting cash.", xp: 50, ok: function () { return S.start > 0 && S.stats.trades >= 1 && retPct() >= 5; } },
   { id: "up10", t: "Up 10%", d: "Grow a game 10% above your starting cash.", xp: 80, ok: function () { return S.start > 0 && S.stats.trades >= 1 && retPct() >= 10; } },
-  { id: "party", t: "Better together", d: "Create or join a party.", xp: 20, ok: function () { return PARTIES.length >= 1; } }
+  { id: "party", t: "Better together", d: "Create or join a party.", xp: 20, ok: function () { return PARTIES.length >= 1; } },
+  { id: "flawless", t: "Flawless", d: "Finish a lesson with no mistakes.", xp: 15, ok: function () { return S.stats.perfect >= 1; } },
+  { id: "streak3", t: "On a roll", d: "Keep a 3-day streak.", xp: 20, ok: function () { return (S.g.streak.best || 0) >= 3; } },
+  { id: "streak7", t: "Week one", d: "Keep a 7-day streak.", xp: 50, ok: function () { return (S.g.streak.best || 0) >= 7; } },
+  { id: "caller", t: "Chart reader", d: "Win 10 Call it rounds.", xp: 25, ok: function () { return S.stats.calls >= 10; } }
 ];
-function xpNow() { var x = 0; ACH.forEach(function (a) { if (S.ach[a.id]) x += a.xp; }); return x; }
+function xpNow() { var x = S.g.lx || 0; ACH.forEach(function (a) { if (S.ach[a.id]) x += a.xp; }); return x; }
 var achTimer;
 function unlockedSet() { var a = []; ["avatar", "banner", "effect", "acc", "accent"].forEach(function (k) { CAT[k].forEach(function (it) { if (it.id !== "none" && isUnlocked(it)) a.push(k + ":" + it.id); }); }); return a; }
 function checkAch() {
@@ -31,15 +37,25 @@ function checkAch() {
   ACH.forEach(function (a) { if (!S.ach[a.id] && a.ok()) { S.ach[a.id] = Date.now(); got.push(a.t); gain += a.xp; } });
   if (!got.length) return;
   var after = unlockedSet(), news = after.filter(function (x) { return before.indexOf(x) < 0; }).map(function (x) { var kv = x.split(":"); return find(CAT[kv[0]], kv[1]).n + " " + KN[kv[0]]; });
-  var b = $("achbar"); b.textContent = "🏆 Achievement unlocked: " + got.join(", ") + " (+" + gain + " XP)" + (news.length ? " · 🎁 New: " + news.join(", ") : ""); b.className = "achbar show";
-  clearTimeout(achTimer); achTimer = setTimeout(function () { b.className = "achbar"; }, 7000);
+  flash("Achievement: " + got.join(", ") + " (+" + gain + " XP)" + (news.length ? ". New in your profile: " + news.join(", ") : ""));
   persist(); sync(); mine(); if ($("profile").className === "") profileUI();
 }
+var flashAt = 0;
+function flash(t) { var b = $("achbar"); if (Date.now() - flashAt < 1500 && b.className === "achbar show") t = b.textContent + ". " + t; flashAt = Date.now(); b.textContent = t; b.className = "achbar show"; clearTimeout(achTimer); achTimer = setTimeout(function () { b.className = "achbar"; }, 6000); }
 function mine() {
   var xp = xpNow(), rk = rankOf(xp), nx = RANKS.filter(function (r) { return r[0] > xp; })[0];
-  $("mine").innerHTML = "<h2>" + rk[1] + " " + rk[2] + "</h2><p class='mute small' style='margin:4px 0 8px'>" + xp + " XP" + (nx ? " · " + (nx[0] - xp) + " XP to " + nx[2] : " · top rank reached") + "</p><div class='bar'><i style='width:" + (nx ? (xp - rk[0]) / (nx[0] - rk[0]) * 100 : 100) + "%'></i></div><div class='achg'>" +
-    ACH.map(function (a) { var on = S.ach[a.id]; return "<div class='at" + (on ? "" : " locked") + "'><b>" + (on ? "🏆 " : "🔒 ") + esc(a.t) + "</b><span class='small mute'>" + esc(a.d) + " +" + a.xp + " XP</span></div>"; }).join("") + "</div>";
-  $("rank").innerHTML = avatarHTML(S.look, 28) + "<span>" + rk[1] + " " + rk[2] + " · " + xp + " XP</span>";
+  $("mine").innerHTML = "<h2>" + rk[1] + "</h2><p class='mute small' style='margin:4px 0 8px'>" + xp + " XP" + (nx ? " · " + (nx[0] - xp) + " XP to " + nx[1] : " · top rank reached") + "</p><div class='bar'><i style='width:" + (nx ? (xp - rk[0]) / (nx[0] - rk[0]) * 100 : 100) + "%'></i></div><div class='achg'>" +
+    ACH.map(function (a) { var on = S.ach[a.id]; return "<div class='at" + (on ? "" : " locked") + "'><b>" + ico(on ? "trophy" : "lock") + esc(a.t) + "</b><span class='small mute'>" + esc(a.d) + " +" + a.xp + " XP</span></div>"; }).join("") + "</div>";
+  $("rank").innerHTML = ico("bolt") + "<span>" + xp + "</span><span class='mute small'>" + rk[1] + "</span>";
+  hud();
+}
+function hud() {
+  var now = Date.now(), st = G.liveStreak(S.g.streak, now), lit = S.g.streak.last === G.dayKey(now);
+  S.g.hearts = G.hearts(S.g.hearts, now);
+  $("hstreak").className = "pill " + (lit ? "fl" : "off"); $("hstreak").innerHTML = ico("flame") + st;
+  $("hstreak").title = st + "-day streak" + (lit ? "" : ". Do a lesson or a Call it round today to keep it.");
+  var m = G.nextHeartMins(S.g.hearts, now), hh = ico("heart") + S.g.hearts.n;
+  $("hhearts").innerHTML = hh; $("phearts").innerHTML = hh; $("hhearts").title = S.g.hearts.n + " hearts" + (m ? ". Next one in " + m + " min" : "");
 }
 
 /* ---------- cosmetics: avatars, banners, effects, accessories, colors (unlocked by rank and achievements) ---------- */
@@ -61,7 +77,7 @@ var CAT = {
 var KN = { avatar: "avatar", banner: "banner", effect: "effect", acc: "accessory", accent: "color" };
 function find(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
 function isUnlocked(it) { if (it.xp) return xpNow() >= it.xp; if (it.ach) return !!S.ach[it.ach]; return true; }
-function reqText(it) { if (it.xp) return "Reach " + rankOf(it.xp)[2]; if (it.ach) { var a = ACH.filter(function (q) { return q.id === it.ach; })[0]; return "Unlock “" + (a ? a.t : it.ach) + "”"; } return ""; }
+function reqText(it) { if (it.xp) return "Reach " + rankOf(it.xp)[1]; if (it.ach) { var a = ACH.filter(function (q) { return q.id === it.ach; })[0]; return "Unlock “" + (a ? a.t : it.ach) + "”"; } return ""; }
 function applyLook() {
   ["avatar", "banner", "effect", "acc", "accent"].forEach(function (k) { var it = find(CAT[k], S.look[k]); if (!it || !isUnlocked(it)) S.look[k] = CAT[k][0].id; });
   var a = find(CAT.accent, S.look.accent), r = document.documentElement;
@@ -81,9 +97,24 @@ function badName(n) { return cleanText(n) !== n.replace(/\s+/g, " ").trim(); }
 
 /* ---------- state: S holds the game you are playing (cash, pos, log, queue, start) plus your account stuff ---------- */
 function newGame(start) { return { start: start || 0, cash: start || 0, pos: {}, log: [], queue: [] }; }
-function fresh() { return { look: { accent: "green", mode: "auto", avatar: "turtle", banner: "forest", effect: "none", acc: "none" }, status: { text: "", t: 0 }, hide: 0, prac: 0, name: "", done: {}, ach: {}, stats: { trades: 0, wins: 0, cuts: 0, queued: 0 }, cur: "solo", games: {}, start: 0, cash: 0, pos: {}, log: [], queue: [] }; }
+function freshG() { return { lx: 0, streak: {}, hearts: { n: G.HEART_MAX, t: Date.now() }, day: null, goal: 30, cseed: Math.floor(Math.random() * 1e9) }; }
+function freshStats() { return { trades: 0, wins: 0, cuts: 0, queued: 0, perfect: 0, calls: 0 }; }
+function fresh() { return { look: { accent: "green", mode: "auto", avatar: "turtle", banner: "forest", effect: "none", acc: "none" }, status: { text: "", t: 0 }, hide: 0, prac: 0, name: "", done: {}, ach: {}, stats: freshStats(), g: freshG(), cur: "solo", games: {}, start: 0, cash: 0, pos: {}, log: [], queue: [] }; }
+// Older saves marked lessons done by position (0, 1, 2...). Lessons now have ids, so map the old positions over.
+var OLD_ORDER = ["stock", "hours", "charts", "orders", "risk", "diversify", "daytrade", "news", "mistakes"];
+function fixDone(d) { var o = {}; Object.keys(d || {}).forEach(function (k) { o[/^\d+$/.test(k) ? OLD_ORDER[+k] || k : k] = 1; }); return o; }
+function fixUp() {
+  S.g = Object.assign(freshG(), S.g); S.g.lx = Math.max(0, Math.min(90000, +S.g.lx || 0)); S.g.cseed = (+S.g.cseed || 0) >>> 0;
+  if ([10, 30, 50].indexOf(+S.g.goal) < 0) S.g.goal = 30; else S.g.goal = +S.g.goal;
+  S.g.streak = S.g.streak && typeof S.g.streak === "object" ? S.g.streak : {}; ["streak", "best", "freezes"].forEach(function (k) { S.g.streak[k] = Math.max(0, Math.floor(+S.g.streak[k] || 0)); });
+  if (!/^\d{4}-\d\d-\d\d$/.test(S.g.streak.last)) S.g.streak.last = "";
+  var h = S.g.hearts || {}; S.g.hearts = { n: Math.max(0, Math.min(G.HEART_MAX, Math.floor(+h.n || 0))), t: +h.t || Date.now() };
+  var d = S.g.day;
+  if (!d || typeof d !== "object" || !/^\d{4}-\d\d-\d\d$/.test(d.k)) S.g.day = null;
+  else { ["xp", "lessons", "perfect", "calls", "rounds", "trades"].forEach(function (k) { d[k] = Math.max(0, Math.floor(+d[k] || 0)); }); d.paid = d.paid && typeof d.paid === "object" ? d.paid : {}; } S.stats = Object.assign(freshStats(), S.stats); S.done = fixDone(S.done); }
 var S = fresh(), PARTIES = [], PB = {}, sb = null, user = null;
 try { var raw = localStorage.getItem("dt3"); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch (e) {}
+fixUp();
 function stash() { S.games[S.cur] = { start: S.start, cash: S.cash, pos: S.pos, log: S.log, queue: S.queue }; }
 function loadGame(slot) {
   var g = S.games[slot];
@@ -250,7 +281,7 @@ function queueOrder(side, q, p) {
   if (side === "Buy") { if (q * est > S.cash - reserved()) { $("toast").textContent = "Not enough available cash for that order (queued buys set cash aside). Try fewer shares."; return; } }
   else { var own = S.pos[sel] ? S.pos[sel].q : 0; if (own - queuedSell(sel) < q) { $("toast").textContent = "You don’t own that many shares of " + sel + " (counting sells already queued)."; return; } }
   S.queue.push({ id: String(Date.now()) + Math.random().toString(36).slice(2, 6), side: side, s: sel, q: q, est: est, t: Date.now() });
-  S.stats.queued++;
+  S.stats.queued++; award(0, { trades: 1 });
   $("toast").textContent = side + " order for " + q + " " + sel + " queued. It fills at the next market open.";
   $("coach").innerHTML = "<div class='coach'><b>Coach:</b> Orders placed while the market is closed fill at the next <i>opening</i> price, which can be quite different from the last close. News often lands overnight, so the price can gap up or down. That is a real risk of after-hours orders.</div>";
   save(); draw();
@@ -304,7 +335,7 @@ function trade(side) {
   $("toast").textContent = side + " " + q + " " + sel + " filled at " + money(p) + ", which includes a small spread.";
   $("coach").innerHTML = "<div class='coach'><b>Coach:</b> " + esc(note) + "</div>";
   if (rev) showReview(rev); else $("review").className = "card hide";
-  save(); draw();
+  award(0, { trades: 1 }); save(); draw();
 }
 function startGame(amt) {
   amt = Math.round(Number(amt));
@@ -319,21 +350,21 @@ function expLeft() { var m = Math.max(0, Math.ceil((864e5 - (Date.now() - S.stat
 function expireStatus() { if (S.status && S.status.text && !statusLive()) { S.status = { text: "", t: 0 }; persist(); sync(); if ($("profile").className === "") profileUI(); } }
 function optBtn(kind, it, label) {
   var on = S.look[kind] === it.id, ok = isUnlocked(it);
-  return "<button class='opt' data-pick='" + kind + ":" + it.id + "' aria-pressed='" + on + "'" + (ok ? "" : " disabled") + ">" + label + "<span>" + esc(it.n) + "</span>" + (ok ? "" : "<small>🔒 " + esc(reqText(it)) + "</small>") + "</button>";
+  return "<button class='opt' data-pick='" + kind + ":" + it.id + "' aria-pressed='" + on + "'" + (ok ? "" : " disabled") + ">" + label + "<span>" + esc(it.n) + "</span>" + (ok ? "" : "<small>" + ico("lock") + " " + esc(reqText(it)) + "</small>") + "</button>";
 }
 function sect(title, kind, labelFn, note) { return "<div class='card'><h3>" + title + "</h3>" + (note ? "<p class='mute small' style='margin:4px 0 0'>" + note + "</p>" : "") + "<div class='opts'>" + CAT[kind].map(function (it) { return optBtn(kind, it, labelFn(it)); }).join("") + "</div></div>"; }
 function profileUI() {
   var b = find(CAT.banner, S.look.banner), rk = rankOf(xpNow()), live = statusLive();
   $("pview").innerHTML =
     "<div class='pcard' style='margin-bottom:14px'><div class='banner fx-" + esc(S.look.effect) + "' style='background-image:" + b.g + "'></div><div class='pbody'>" + avatarHTML(S.look, 84) +
-    "<div><b style='font:800 22px Fraunces,Georgia,serif'>" + esc(S.name || "You") + "</b> <span class='mute small'>" + rk[1] + " " + rk[2] + " · " + xpNow() + " XP</span>" + (live ? "<div class='small'>“" + esc(S.status.text) + "” <span class='mute'>· " + expLeft() + "</span></div>" : "") + "</div></div></div>" +
+    "<div><b style='font:800 24px Bricolage Grotesque,sans-serif'>" + esc(S.name || "You") + "</b> <span class='mute small'>" + rk[1] + " · " + xpNow() + " XP</span>" + (live ? "<div class='small'>“" + esc(S.status.text) + "” <span class='mute'>· " + expLeft() + "</span></div>" : "") + "</div></div></div>" +
     "<div class='card'><h3>Status of the day</h3><p class='mute small' style='margin:4px 0 8px'>A short message on your profile and the leaderboards. It disappears after 24 hours, and you can replace or delete it any time. Bad words are replaced with ####.</p><div class='row'><input type='text' id='stin' maxlength='60' placeholder='What’s on your mind?' aria-label='Status of the day' value='" + esc(stDraft || (live ? S.status.text : "")) + "'><button class='b ghost' id='stpost'>Post</button>" + (live ? "<button class='b ghost' id='stdel'>Delete now</button>" : "") + "</div><div class='toast' id='stmsg' aria-live='polite'></div></div>" +
     sect("Interface color", "accent", function (it) { return "<span class='dotc' style='background:" + it.c + "'></span>"; }) +
-    sect("Light or dark", "mode", function (it) { return "<span class='e'>" + (it.id === "auto" ? "🌗" : it.id === "light" ? "☀️" : "🌙") + "</span>"; }) +
+    sect("Light or dark", "mode", function (it) { return "<span class='sw' style='border:2px solid var(--line);background:" + (it.id === "auto" ? "linear-gradient(90deg,#f6f2e8 50%,#15130f 50%)" : it.id === "light" ? "#f6f2e8" : "#15130f") + "'></span>"; }) +
     sect("Profile picture", "avatar", function (it) { return "<span class='e'>" + it.e + "</span>"; }, "Cooler ones unlock as you rank up and earn achievements.") +
-    sect("Accessory", "acc", function (it) { return "<span class='e'>" + (it.e || "—") + "</span>"; }, "Sits on top of your picture.") +
+    sect("Accessory", "acc", function (it) { return "<span class='e'>" + (it.e || "&nbsp;") + "</span>"; }, "Sits on top of your picture.") +
     sect("Banner color", "banner", function (it) { return "<span class='sw' style='background-image:" + it.g + "'></span>"; }) +
-    sect("Banner effect", "effect", function (it) { return "<span class='e'>" + (it.id === "none" ? "—" : "✨") + "</span>"; });
+    sect("Banner effect", "effect", function (it) { return "<span class='sw fx-" + it.id + "' style='position:relative;overflow:hidden;background:#1f5e3b'></span>"; });
   $("stin").oninput = function () { stDraft = this.value; };
   $("stpost").onclick = function () {
     var raw = $("stin").value.trim(); if (!raw) { $("stmsg").textContent = "Type something first."; return; }
@@ -343,16 +374,163 @@ function profileUI() {
   if ($("stdel")) $("stdel").onclick = function () { S.status = { text: "", t: 0 }; stDraft = ""; save(); profileUI(); };
 }
 
-/* ---------- lessons + news ---------- */
-function lessons() {
-  var L = window.LESSONS || [], n = doneCount();
-  $("prog").style.width = (L.length ? n / L.length * 100 : 0) + "%"; $("progt").textContent = n + " of " + L.length + " lessons done";
-  $("lessons").innerHTML = L.map(function (l, i) {
-    var vid = l.yt ? "<div class='vid'><iframe loading='lazy' title='" + esc(l.t) + "' src='https://www.youtube-nocookie.com/embed/" + encodeURIComponent(l.yt) + "' allowfullscreen></iframe></div>" : "";
-    return "<details" + (S.done[i] ? " class='done'" : "") + "><summary>" + (i + 1) + ". " + esc(l.t) + "</summary><p>" + esc(l.b) + "</p><p class='mute'>Tip: " + esc(l.tip) + "</p>" + vid +
-      "<div class='row' style='padding-bottom:12px'><a class='b ghost' style='text-decoration:none' target='_blank' rel='noopener noreferrer' href='https://www.youtube.com/results?search_query=" + encodeURIComponent(l.q) + "'>Find more videos</a><button class='b ghost' data-d='" + i + "'>" + (S.done[i] ? "Mark as not done" : "I’ve got this") + "</button></div></details>";
+/* ---------- learn: lesson path, daily goal, quests, Call it ---------- */
+function day() { S.g.day = G.today(S.g.day, Date.now()); return S.g.day; }
+// Adds XP and bumps today's counters, then pays out any quest that's now complete (+10 XP each).
+function award(xp, what) {
+  var d = day(), paid = [], more = true;
+  S.g.lx += xp; d.xp += xp;
+  Object.keys(what || {}).forEach(function (k) { d[k] = (d[k] || 0) + what[k]; });
+  while (more) {
+    more = false;
+    G.questsFor(d.k).forEach(function (q) { if (!d.paid[q.id] && (d[q.k] || 0) >= q.n) { d.paid[q.id] = 1; S.g.lx += 10; d.xp += 10; paid.push(q.t); more = true; } });
+  }
+  if (paid.length) flash("Quest done: " + paid.join(", ") + " (+" + paid.length * 10 + " XP)");
+  persist(); sync(); checkAch(); mine(); goalUI(); questsUI();
+}
+function learnUI() {
+  var done = S.done, nx = G.nextLesson(UNITS, done);
+  $("path").innerHTML = UNITS.map(function (u) {
+    var c = u.lessons.filter(function (l) { return done[l.id]; }).length;
+    return "<div class='unit' style='--uc:" + u.c + "'><small>" + esc(u.t) + " · " + c + " of " + u.lessons.length + " done</small><h2>" + esc(u.n) + "</h2></div><div class='path' style='--uc:" + u.c + "'>" +
+      u.lessons.map(function (l) {
+        var open = G.isOpen(UNITS, done, l.id), d = done[l.id], cur = l.id === nx;
+        return "<div class='nodewrap'>" + (cur ? "<span class='bub'>" + (doneCount() ? "Next up" : "Start here") + "</span>" : "") +
+          "<button class='node" + (open ? "" : " locked") + (cur ? " cur" : "") + "' data-lesson='" + esc(l.id) + "'" + (open ? "" : " disabled") + " aria-label='" + esc(l.t) + (d ? ", done" : open ? "" : ", locked") + "'>" + ico(d ? "check" : open ? "star" : "lock") + "</button>" + esc(l.t) + "</div>";
+      }).join("") + "</div>";
+  }).join("");
+  goalUI(); questsUI(); callUI();
+}
+function goalUI() {
+  var d = day(), g = S.g.goal, pct = Math.min(100, d.xp / g * 100), fz = Number(S.g.streak.freezes) || 0;
+  $("goal").innerHTML = "<h3>Daily goal</h3><p class='mute small' style='margin:4px 0 8px'>" + (d.xp >= g ? "Goal met. See you tomorrow." : (g - d.xp) + " XP to go today.") + "</p>" +
+    "<b>" + d.xp + "</b> <span class='mute'>/ " + g + " XP</span><div class='bar' style='margin:8px 0 12px'><i style='width:" + pct + "%'></i></div>" +
+    "<div class='chips'>" + [[10, "Easy"], [30, "Steady"], [50, "Serious"]].map(function (o) { return "<button class='chip' data-goal='" + o[0] + "' aria-pressed='" + (o[0] === g) + "'>" + o[1] + " · " + o[0] + "</button>"; }).join("") + "</div>" +
+    "<p class='mute small' style='margin:0'>" + ico("snow") + " " + fz + " streak freeze" + (fz === 1 ? "" : "s") + ". A freeze covers one missed day, and you earn one every 7 days in a row.</p>";
+}
+function questsUI() {
+  var d = day();
+  $("quests").innerHTML = G.questsFor(d.k).map(function (q) {
+    var v = Math.min(q.n, d[q.k] || 0), ok = d.paid[q.id];
+    return "<li class='" + (ok ? "ok" : "") + "'>" + ico(ok ? "check" : "bolt") + "<div style='flex:1'><b>" + esc(q.t) + "</b><div class='bar' style='margin-top:6px'><i style='width:" + v / q.n * 100 + "%'></i></div></div><span class='small mute'>" + v + "/" + q.n + "</span></li>";
   }).join("");
 }
+
+/* Call it: guess where a made-up chart goes next. */
+var CR = null;
+function callSVG(show) {
+  var all = CR.candles, c = show ? all : all.slice(0, CR.cut), sc = scaleOf(c), W = 600 / all.length, bw = W * 0.6, x0 = CR.cut * W, s = "";
+  c.forEach(function (k, i) {
+    var x = i * W + W / 2, col = k.c >= k.o ? "var(--up)" : "var(--down)", y1 = sc.y(Math.max(k.o, k.c)), y2 = sc.y(Math.min(k.o, k.c));
+    s += "<line x1='" + x.toFixed(1) + "' x2='" + x.toFixed(1) + "' y1='" + sc.y(k.h).toFixed(1) + "' y2='" + sc.y(k.l).toFixed(1) + "' stroke='" + col + "'/><rect x='" + (x - bw / 2).toFixed(1) + "' y='" + y1.toFixed(1) + "' width='" + bw.toFixed(1) + "' height='" + Math.max(1.5, y2 - y1).toFixed(1) + "' fill='" + col + "'/>";
+  });
+  s += "<line x1='" + x0 + "' x2='" + x0 + "' y1='20' y2='206' stroke='var(--mute)' stroke-dasharray='3 5'/>";
+  if (!show) s += "<text x='" + (x0 + (600 - x0) / 2) + "' y='125' text-anchor='middle' fill='var(--mute)' font-size='44' font-weight='800'>?</text>";
+  return s;
+}
+function callUI() {
+  if (!CR) CR = G.round(S.g.cseed);
+  $("cchart").innerHTML = callSVG(CR.done);
+  $("cbtns").innerHTML = CR.done ? "<button class='b go' data-call='next'>Next chart</button>" : "<button class='b buy' data-call='up'>Up</button><button class='b sell' data-call='down'>Down</button>";
+  $("cmsg").innerHTML = CR.msg || "";
+}
+function callIt(dir) {
+  if (dir === "next") { CR = null; callUI(); return; }
+  if (!CR || CR.done) return;
+  var win = dir === CR.answer, now = Date.now(), kept = CR.answer === CR.trend;
+  CR.done = 1; S.g.cseed = (S.g.cseed + 1) >>> 0;
+  if (win) { S.stats.calls++; S.g.hearts = G.gainHeart(S.g.hearts, now); }
+  S.g.streak = G.touchStreak(S.g.streak, now);
+  CR.msg = (win ? "<b class='up'>Good call.</b> +5 XP and a heart. " : "<b class='dn'>Not this time.</b> ") + (kept ? "The trend kept going, which happens more often than not." : "The trend flipped. A trend tilts the odds, it doesn't promise anything.");
+  callUI(); award(win ? 5 : 0, { rounds: 1, calls: win ? 1 : 0 });
+}
+
+/* The lesson player: a few reading cards, then a quiz. A wrong answer costs a heart and comes back at the end. */
+var PL = null;
+function shuffle(n) { var a = []; for (var i = 0; i < n; i++) a.push(i); for (var j = n - 1; j > 0; j--) { var k = Math.floor(Math.random() * (j + 1)), t = a[j]; a[j] = a[k]; a[k] = t; } return a; }
+function ask(q) { return { k: "q", q: q, order: q.k === "tf" ? [0, 1] : shuffle(q.a.length) }; }
+function optLabel(q, j) { return q.k === "tf" ? (j === 0 ? "True" : "False") : q.a[j]; }
+function isRight(q, j) { return q.k === "tf" ? (j === 0) === q.c : j === q.c; }
+function videoHTML(l) {
+  return (l.yt ? "<div class='vid'><iframe loading='lazy' title='" + esc(l.t) + "' src='https://www.youtube-nocookie.com/embed/" + encodeURIComponent(l.yt) + "' allowfullscreen></iframe></div>" : "") +
+    "<p><a target='_blank' rel='noopener noreferrer' href='https://www.youtube.com/results?search_query=" + encodeURIComponent(l.q) + "'>Find videos on this</a></p>";
+}
+function openLesson(id) {
+  var f = G.flat(UNITS).filter(function (x) { return x.l.id === id; })[0];
+  if (!f || !G.isOpen(UNITS, S.done, id)) return;
+  var l = f.l, steps = l.cards.map(function (t) { return { k: "read", t: t }; });
+  steps.push({ k: "read", t: l.tip, tip: 1 });
+  l.quiz.forEach(function (q) { steps.push(ask(q)); });
+  PL = { l: l, s: steps, i: 0, mis: 0, good: 0, need: steps.length, mode: "read", pick: null };
+  $("player").className = "overlay"; document.body.style.overflow = "hidden"; document.querySelector(".wrap").inert = true;
+  S.g.hearts = G.hearts(S.g.hearts, Date.now());
+  if (S.g.hearts.n <= 0) outOfHearts(); else step();
+}
+function step() {
+  var st = PL.s[PL.i];
+  $("pprog").style.width = PL.good / PL.need * 100 + "%"; $("pfoot").className = "pfoot"; $("pmsgx").innerHTML = ""; $("pnext").disabled = false; hud();
+  if (st.k === "read") {
+    $("pmain").innerHTML = "<p class='mute small'>" + esc(PL.l.t) + "</p><h2 id='ptitle'>" + (st.tip ? "Remember this" : "Read") + "</h2><p class='read'>" + esc(st.t) + "</p>" + (st.tip ? videoHTML(PL.l) : "");
+    PL.mode = "read"; $("pnext").textContent = "Continue"; $("pnext").focus();
+  } else {
+    var q = st.q;
+    $("pmain").innerHTML = "<p class='mute small'>" + (q.k === "tf" ? "True or false?" : "Pick one") + "</p><h2 id='ptitle'>" + esc(q.q) + "</h2><div class='ans'>" +
+      st.order.map(function (j) { return "<button data-ans='" + j + "' aria-pressed='false'>" + esc(optLabel(q, j)) + "</button>"; }).join("") + "</div>";
+    PL.mode = "ask"; PL.pick = null; $("pnext").textContent = "Check"; $("pnext").disabled = true;
+    var b = document.querySelector("#pmain [data-ans]"); if (b) b.focus();
+  }
+}
+function pickAns(btn) {
+  if (!PL || PL.mode !== "ask") return;
+  PL.pick = +btn.dataset.ans;
+  document.querySelectorAll("#pmain [data-ans]").forEach(function (b) { b.setAttribute("aria-pressed", b === btn); });
+  $("pnext").disabled = false;
+}
+function nextStep() {
+  if (!PL) return;
+  if (PL.mode === "read") { PL.good++; advance(); return; }
+  if (PL.mode === "ask") {
+    if (PL.pick === null) return;
+    var q = PL.s[PL.i].q, now = Date.now(), right = q.k === "tf" ? (q.c ? 0 : 1) : q.c;
+    document.querySelectorAll("#pmain [data-ans]").forEach(function (b) { b.disabled = true; });
+    if (isRight(q, PL.pick)) { PL.good++; $("pfoot").className = "pfoot good"; $("pmsgx").innerHTML = "<b>" + ico("check") + " Correct.</b> " + esc(q.why); }
+    else {
+      PL.mis++; S.g.hearts = G.loseHeart(S.g.hearts, now); PL.s.push(ask(q)); persist(); hud();
+      $("pfoot").className = "pfoot bad"; $("pmsgx").innerHTML = "<b>" + ico("x") + " The answer: " + esc(optLabel(q, right)) + ".</b> " + esc(q.why) + " This one comes back at the end.";
+    }
+    $("pprog").style.width = PL.good / PL.need * 100 + "%";
+    PL.mode = "after"; $("pnext").textContent = "Continue"; $("pnext").focus(); return;
+  }
+  if (PL.mode === "after") { if (S.g.hearts.n <= 0) outOfHearts(); else advance(); return; }
+  closeLesson();
+}
+function advance() { PL.i++; if (PL.i >= PL.s.length) finish(); else step(); }
+function finish() {
+  var l = PL.l, first = !S.done[l.id], xp = first ? G.lessonXP(PL.mis) : 5, now = Date.now(), was = G.liveStreak(S.g.streak, now), lit = S.g.streak.last === G.dayKey(now);
+  S.done[l.id] = 1; if (!PL.mis) S.stats.perfect++;
+  S.g.streak = G.touchStreak(S.g.streak, now);
+  award(xp, { lessons: 1, perfect: PL.mis ? 0 : 1 });
+  var n = S.g.streak.streak;
+  $("pprog").style.width = "100%";
+  $("pmain").innerHTML = "<div class='done-big'>" + ico("star") + "<h2 id='ptitle'>" + (PL.mis ? "Lesson done" : "Perfect lesson") + "</h2><p class='mute'>" + esc(l.t) + "</p>" +
+    "<div class='tiles'><div class='tile'><span class='small mute'>XP</span><b>+" + xp + "</b></div><div class='tile'><span class='small mute'>Streak</span><b>" + n + " day" + (n === 1 ? "" : "s") + "</b></div><div class='tile'><span class='small mute'>Mistakes</span><b>" + PL.mis + "</b></div></div>" +
+    (!lit ? "<p>" + (n > 1 && n > was ? "Your streak is now " + n + " days." : "You started a streak. Come back tomorrow to keep it going.") + "</p>" : "") + (first ? "" : "<p class='mute small'>Replays earn 5 XP.</p>") + "</div>";
+  $("pfoot").className = "pfoot good"; $("pmsgx").innerHTML = ""; $("pnext").textContent = "Continue"; $("pnext").disabled = false; $("pnext").focus();
+  PL.mode = "done"; learnUI();
+}
+function outOfHearts() {
+  var m = G.nextHeartMins(S.g.hearts, Date.now());
+  $("pmain").innerHTML = "<div class='done-big'>" + ico("heart") + "<h2 id='ptitle'>Out of hearts</h2><p>One comes back every 30 minutes. The next one is in " + m + " min.</p><p class='mute'>Or win a round of Call it on the Learn page to earn one now.</p></div>";
+  $("pprog").style.width = "0%"; $("pfoot").className = "pfoot bad"; $("pmsgx").innerHTML = ""; $("pnext").textContent = "Back to the path"; $("pnext").disabled = false; $("pnext").focus();
+  PL.mode = "out"; hud();
+}
+function closeLesson() {
+  if (PL && (PL.mode === "ask" || PL.mode === "after" || (PL.mode === "read" && PL.i > 0)) && !confirm("Quit this lesson? You'll start it over next time.")) return;
+  var id = PL && PL.l.id; PL = null; $("player").className = "overlay hide"; document.body.style.overflow = ""; document.querySelector(".wrap").inert = false; learnUI(); hud();
+  var n = id && document.querySelector("[data-lesson='" + id + "']"); if (n) n.focus();
+}
+
+/* ---------- headlines ---------- */
 function news() {
   fetch("/api/news").then(function (r) { return r.json(); }).then(function (d) {
     if (!Array.isArray(d) || !d.length) throw new Error("none");
@@ -392,7 +570,7 @@ function authUI() {
   } else {
     a.innerHTML = "<h2>You’re signed in</h2><p class='mute small' style='margin:4px 0 8px'>Your games, orders, achievements, and lesson progress save automatically.</p><div class='row'><label for='dn'>Display name</label><input type='text' id='dn' maxlength='20' value='" + esc(S.name) + "'><button class='b ghost' id='sn'>Save name</button><button class='b ghost' id='so'>Log out</button></div><div class='small' id='authmsg'></div>";
     $("sn").onclick = function () { var n = $("dn").value.trim(); if (n.length < 2) { amsg("Name must be at least 2 characters."); return; } if (badName(n)) { amsg("Please choose a different display name."); return; } S.name = n; persist(); doSync(true); amsg("Saved."); };
-    $("so").onclick = function () { sb.auth.signOut().then(function () { var h = S.hide; S = fresh(); S.hide = h; PARTIES = []; PB = {}; persist(); lessons(); draw(); partiesUI(); mine(); $("coach").innerHTML = ""; }); };
+    $("so").onclick = function () { sb.auth.signOut().then(function () { var h = S.hide; S = fresh(); S.hide = h; user = null; PARTIES = []; PB = {}; CR = null; persist(); authUI(); learnUI(); draw(); partiesUI(); mine(); $("coach").innerHTML = ""; }); };
   }
 }
 function gameOf(slot) { return slot === S.cur ? { start: S.start, cash: S.cash, pos: S.pos, log: S.log, queue: S.queue } : S.games[slot]; }
@@ -405,18 +583,25 @@ function sync() { clearTimeout(syncTimer); syncTimer = setTimeout(doSync, 800); 
 function doSync(boards) {
   if (!sb || !user || !S.name) return;
   Promise.all([
-    sb.from("profiles").upsert({ user_id: user.id, display_name: S.name, xp: xpNow(), achievements: { ach: S.ach, stats: S.stats, done: S.done }, look: S.look, status: (statusLive() ? S.status.text : null) }).then(function (r) { if (r.error) amsg("Couldn’t save your profile: " + r.error.message); }),
+    sb.from("profiles").upsert({ user_id: user.id, display_name: S.name, xp: xpNow(), achievements: { ach: S.ach, stats: S.stats, done: S.done, g: S.g }, look: S.look, status: (statusLive() ? S.status.text : null) }).then(function (r) { if (r.error) amsg("Couldn’t save your profile: " + r.error.message); }),
     pushRow(S.cur)
   ]).then(function () { if (boards !== false) { loadBoard(); } });
 }
-function badge(xp) { return rankOf(xp || 0)[1]; }
+function badge(xp) { return "<span class='mute small'>" + rankOf(xp || 0)[1] + "</span>"; }
 function row(avLook, xp, name, status, right) {
-  return "<li>" + avatarHTML(avLook, 28) + " " + badge(xp) + " " + esc(name) + "<span>" + right + "</span>" + (status ? "<div class='small mute' style='margin-left:36px'>“" + esc(status) + "”</div>" : "") + "</li>";
+  return "<li>" + avatarHTML(avLook, 28) + " " + esc(name) + " " + badge(xp) + "<span>" + right + "</span>" + (status ? "<div class='small mute' style='margin-left:36px'>“" + esc(status) + "”</div>" : "") + "</li>";
 }
 function loadBoard() {
   if (!sb) { $("lb").innerHTML = "<li class='mute'>Leaderboard isn’t set up yet.</li>"; return; }
   sb.from("global_leaderboard").select("display_name,return_pct,total_value,xp,look,status").order("return_pct", { ascending: false }).limit(20).then(function (r) {
     $("lb").innerHTML = r.error || !r.data.length ? "<li class='mute'>No one is on the board yet. Be the first.</li>" : r.data.map(function (x) { return row(x.look, x.xp, x.display_name, x.status, fmtp(Number(x.return_pct)) + " · " + money(Number(x.total_value))); }).join("");
+  });
+}
+function loadXP() {
+  if (!sb) { $("xlb").innerHTML = "<li class='mute'>The league isn’t set up yet.</li>"; return; }
+  if (!user) { $("xlb").innerHTML = "<li class='mute'>Log in on the Trade tab to see the XP league.</li>"; return; }
+  sb.from("profiles").select("display_name,xp,look,status,status_at").order("xp", { ascending: false }).limit(20).then(function (r) {
+    $("xlb").innerHTML = r.error || !r.data.length ? "<li class='mute'>No one has earned XP yet.</li>" : r.data.map(function (x) { var live = x.status && x.status_at && Date.now() - Date.parse(x.status_at) < 864e5; return row(x.look, x.xp, x.display_name, live ? x.status : "", Number(x.xp) + " XP"); }).join("");
   });
 }
 function loadPartyBoard(p) {
@@ -463,16 +648,22 @@ function onUser(u) {
     sb.from("parties").select("*").order("created_at")
   ]).then(function (rs) {
     var rows = rs[0].data || [], prof = rs[1].data; PARTIES = rs[2].data || [];
+    if (S.uid && S.uid !== u.id) { var hd = S.hide; S = fresh(); S.hide = hd; } // this browser last held someone else's account
+    var wasGuest = !S.uid; S.uid = u.id;
     var guest = S.cur === "solo" && S.start > 0 ? { start: S.start, cash: S.cash, pos: S.pos, log: S.log, queue: S.queue } : null;
     if (rows.length || prof) {
       S.games = {}; rows.forEach(function (x) { S.games[x.slot] = { start: Number(x.start_cash), cash: Number(x.cash), pos: x.positions || {}, log: x.log || [], queue: x.queue || [] }; });
       if (!S.games.solo && guest) S.games.solo = guest;
-      if (prof) { var a = prof.achievements || {}; S.name = prof.display_name; S.ach = a.ach || {}; S.stats = a.stats || S.stats; S.done = a.done || {}; S.look = Object.assign({}, S.look, prof.look || {}); S.status = { text: prof.status || "", t: prof.status_at ? Date.parse(prof.status_at) : 0 }; }
+      if (prof) { var a = prof.achievements || {}; S.name = prof.display_name; S.ach = a.ach || {}; S.stats = a.stats || S.stats; S.done = Object.assign(fixDone(a.done), S.done);
+        if (a.g) { var lg = S.g; S.g = a.g; CR = null;
+          if (wasGuest) { S.g.lx = (+a.g.lx || 0) + (lg.lx || 0); if (lg.streak.last && !(a.g.streak && a.g.streak.last > lg.streak.last)) S.g.streak = lg.streak; }
+          else if ((lg.lx || 0) > (+a.g.lx || 0)) S.g = lg; }
+        fixUp(); S.look = Object.assign({}, S.look, prof.look || {}); S.status = { text: prof.status || "", t: prof.status_at ? Date.parse(prof.status_at) : 0 }; }
       loadGame(S.games.solo ? "solo" : "solo");
     } else {
       var m = (u.user_metadata && u.user_metadata.display_name) || ""; if (m) S.name = m; stash(); // first login: keep what you did as a guest
     }
-    applyLook(); expireStatus(); persist(); authUI(); lessons(); partiesUI(); PARTIES.forEach(loadPartyBoard); processQueue(); draw(); mine(); doSync();
+    applyLook(); expireStatus(); persist(); authUI(); learnUI(); partiesUI(); PARTIES.forEach(loadPartyBoard); processQueue(); draw(); mine(); doSync();
   });
 }
 if (sb) {
@@ -483,17 +674,21 @@ if (sb) {
 /* ---------- tabs and wiring ---------- */
 function setTab(name) {
   document.querySelectorAll("nav button").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.t === name); });
-  ["trade", "learn", "news", "party", "board", "profile"].forEach(function (s) { $(s).className = s === name ? "" : "hide"; });
-  if (name === "board") { loadBoard(); mine(); }
+  ["learn", "trade", "party", "board", "profile"].forEach(function (s) { $(s).className = s === name ? "" : "hide"; });
+  if (name === "board") { loadBoard(); loadXP(); mine(); }
+  if (name === "learn") learnUI();
   if (name === "profile") profileUI();
   if (name === "party") { partiesUI(); PARTIES.forEach(loadPartyBoard); }
 }
 document.addEventListener("click", function (e) {
-  var t = e.target.closest("[data-t]"), c = e.target.closest("[data-s]"), d = e.target.closest("[data-d]"), r = e.target.closest("[data-r]"), q = e.target.closest("[data-q]"), pl = e.target.closest("[data-play]"), am = e.target.closest("[data-amt]"), md = e.target.closest("[data-mode]"), rv = e.target.closest("[data-rv]"), pk = e.target.closest("[data-pick]");
+  var t = e.target.closest("[data-t]"), c = e.target.closest("[data-s]"), ls = e.target.closest("[data-lesson]"), an = e.target.closest("[data-ans]"), gl = e.target.closest("[data-goal]"), ca = e.target.closest("[data-call]"), r = e.target.closest("[data-r]"), q = e.target.closest("[data-q]"), pl = e.target.closest("[data-play]"), am = e.target.closest("[data-amt]"), md = e.target.closest("[data-mode]"), rv = e.target.closest("[data-rv]"), pk = e.target.closest("[data-pick]");
   if (t) setTab(t.dataset.t);
   if (c) { sel = c.dataset.s; draw(); }
   if (r) { RANGE = r.dataset.r; draw(); }
-  if (d) { var i = d.dataset.d; if (S.done[i]) delete S.done[i]; else S.done[i] = 1; save(); lessons(); }
+  if (ls && !ls.disabled) openLesson(ls.dataset.lesson);
+  if (an && !an.disabled) pickAns(an);
+  if (gl) { S.g.goal = +gl.dataset.goal; persist(); sync(); goalUI(); }
+  if (ca) callIt(ca.dataset.call);
   if (q) { S.queue = S.queue.filter(function (o) { return o.id !== q.dataset.q; }); save(); draw(); }
   if (pl) switchGame(pl.dataset.play);
   if (am) startGame(am.dataset.amt);
@@ -501,6 +696,8 @@ document.addEventListener("click", function (e) {
   if (rv) $("review").className = "card hide";
   if (pk && !pk.disabled) { var kv = pk.dataset.pick.split(":"); S.look[kv[0]] = kv[1]; applyLook(); persist(); sync(); profileUI(); mine(); }
 });
+$("pnext").onclick = nextStep; $("pclose").onclick = closeLesson;
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && PL) closeLesson(); });
 $("buy").onclick = function () { trade("Buy"); }; $("sell").onclick = function () { trade("Sell"); };
 $("qty").oninput = draw;
 $("amtgo").onclick = function () { startGame($("amt").value); };
@@ -525,7 +722,7 @@ if (sb) {
   setInterval(function () { if (user && S.start > 0) doSync(false); }, 300000);
 }
 if (S.hide) $("start").className = "card hide";
-loadGame(S.cur); applyLook(); expireStatus(); lessons(); draw(); clock(); prices(); news(); loadBoard(); mine(); partiesUI();
+loadGame(S.cur); applyLook(); expireStatus(); learnUI(); draw(); clock(); prices(); news(); loadBoard(); mine(); partiesUI();
 window.__refresh = function () { clock(); prices(); };
-setInterval(function () { prices(); }, 60000); setInterval(function () { if (mkt().open) prices(sel); }, 5000); setInterval(tick, 1000); setInterval(function () { clock(); expireStatus(); }, 15000);
+setInterval(function () { prices(); }, 60000); setInterval(function () { if (mkt().open) prices(sel); }, 5000); setInterval(tick, 1000); setInterval(function () { clock(); expireStatus(); hud(); }, 15000);
 })();

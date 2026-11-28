@@ -2,12 +2,18 @@
 
 *Practice like it’s real.*
 
-Free paper-trading site that teaches beginners to trade. Real (delayed) prices, price history, lessons, news, accounts, parties with friends, achievements and ranks, and a global leaderboard. Everything runs on free tiers.
+Learn to trade the way you'd learn a language: a few minutes a day, one short lesson at a time, then practice with real (delayed) prices and pretend money. Streaks, hearts, daily quests, leagues and parties with friends keep you coming back. Everything runs on free tiers.
 
 ## What's inside
+- **A lesson path.** 12 short lessons in 4 units, from "what is a stock" to "the mistakes that sink beginners". Each one is a few reading cards and a 3-question quiz. Lessons unlock in order.
+- **Hearts.** A wrong answer costs a heart, and that question comes back at the end of the lesson. Hearts refill one every 30 minutes, up to 5.
+- **Streaks.** Do a lesson or a Call it round each day to keep your streak. Every 7 days in a row earns a streak freeze (you can hold 2), which covers one missed day.
+- **Daily goal and quests.** Pick a daily XP goal (10, 30 or 50). Three quests change every day, the same three for everyone, and each pays 10 XP.
+- **Call it.** A made-up chart stops halfway. Guess up or down. A right call gives 5 XP and a heart. Trends carry on about two times in three, which is the lesson: momentum tilts the odds, it doesn't promise anything.
+- **Leagues.** An XP league for learners next to the best-traders board.
 - **Games with your own starting amount.** Each player picks $10k, $50k, $100k, $1M, or a custom amount. Rankings use percent return, so any amount is fair.
 - **Parties.** Create a party, pick the starting money, and share the 6-letter code. Everyone starts equal and gets a private leaderboard. Switch games from the Game menu on the Trade tab.
-- **Achievements and ranks.** Milestones give XP. Ranks: Starter, Trader, Pro, Expert.
+- **Achievements and ranks.** Milestones give XP. Ranks: Starter, Trader, Pro, Expert, Legend.
 - **Profile and settings.** Pick an interface color and light/dark mode, a profile picture, an accessory (crown, top hat, cap...), a banner color and effect. Cooler items unlock as you rank up and earn achievements.
 - **Status of the day.** A short message (60 characters) shown on your profile and the leaderboards. It disappears after 24 hours and can be replaced any time. Bad words become ####.
 - **Chart ranges:** Live, Today, Yesterday, Past week, Past month.
@@ -43,8 +49,16 @@ vercel dev
 ```
 Put `FINNHUB_KEY=...` and `TWELVE_KEY=...` in a file named `.env` first.
 
-## Add real videos
-Open `public/lessons.js` and put a YouTube video ID in each lesson's `yt` field (the part after `v=`). The video then plays inside the lesson.
+## Run the tests
+The game rules (streaks, hearts, quests, unlocks, Call it rounds) live in `public/game.js` with no page code, so they're tested in Node with nothing to install:
+```
+npm test
+```
+
+## Write or change a lesson
+Lessons live in `public/lessons.js`. Each one has an `id`, a title `t`, a few `cards` to read, a `tip`, and a `quiz`. A quiz question is either `{ k: "mc", q, a: [options], c: index of the right one, why }` or `{ k: "tf", q, c: true or false, why }`. Options are shuffled when shown, so putting the right one first is fine. Don't rename an `id` once people have played, because progress is saved by id.
+
+To embed a video, put a YouTube video ID in the lesson's `yt` field (the part after `v=`). It shows on the tip card.
 
 ## How closed-market orders work
 - When the market is closed, Buy/Sell become **Queue buy / Queue sell**. Cash for queued buys is set aside and queued sells count against shares you own.
@@ -58,6 +72,7 @@ The status and display names are filtered in the browser and again in the databa
 ## Known limits (good next projects)
 - **Leaderboards can be cheated.** The browser reports its own account value, so a technical user could fake it. Fix: do trades in an API function that checks prices and updates the database itself. A scheduled job (Vercel Cron plus a Supabase service key) could also fill everyone's queued orders at exactly 9:30. This is the best next upgrade and a great interview story.
 - Free prices can be delayed. The site says so. For true real-time, look at Finnhub's or Alpaca's free streaming and check their current limits.
+- XP is reported by the browser too, so the XP league has the same weakness. The same fix applies: award XP in a database function.
 - Market holidays aren't handled by the clock.
 - Only market orders so far. Add limit and stop orders next.
 - Party members can see each other's names, returns and ranks, but never each other's positions.
